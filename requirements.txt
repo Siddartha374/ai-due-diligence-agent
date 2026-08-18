@@ -1,0 +1,8 @@
+streamlit
+pandas
+pdfplumber
+sqlalchemy
+python-dotenv
+google-genai
+altair
+pytest
