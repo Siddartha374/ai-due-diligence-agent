@@ -37,8 +37,14 @@ from rules import run_rules
 load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STORAGE_DIR = os.path.join(BASE_DIR, "storage")
-DB_PATH = os.path.join(BASE_DIR, "diligence.db")
+
+if os.path.isdir("/mount/src") or not os.access(BASE_DIR, os.W_OK):
+    DATA_DIR = "/tmp"
+else:
+    DATA_DIR = BASE_DIR
+
+STORAGE_DIR = os.path.join(DATA_DIR, "storage")
+DB_PATH = os.path.join(DATA_DIR, "diligence.db")
 
 os.makedirs(STORAGE_DIR, exist_ok=True)
 
