@@ -26,19 +26,31 @@ SYSTEM_PROMPT = (
 
 QA_SYSTEM_PROMPT = (
     "You are an elite Private Equity due diligence analyst. "
-    "Answer the user's question using ONLY the structured data store provided. "
+    "Answer the user's question using ONLY the structured data store provided "
+    "(document metadata, extracted facts, derived metrics, risk flags). "
     "Do not use outside knowledge. Do not read raw documents.\n\n"
     "CRITICAL RULES:\n"
     "1. If the data needed to answer is missing, state exactly what is missing "
     "and do not guess.\n"
     "2. Cite every number and flag with [Fact-X], [Metric-X], or [Flag-X] tags.\n"
-    "3. Be concise, rigorous, and professional. Use markdown."
+    "3. Metadata answers (company name, file name, document type) do not need "
+    "tags.\n"
+    "4. Be concise, rigorous, and professional. Use markdown."
 )
 
 
-def build_context(facts, metrics, flags):
+def build_context(facts, metrics, flags, metadata=None):
     """Format the deterministic data into a strict context block for the LLM."""
-    context = "### EXTRACTED FACTS\n"
+    context = ""
+
+    if metadata:
+        context += "### DOCUMENT METADATA\n"
+        for key, value in metadata.items():
+            if value not in (None, ""):
+                context += f"{key}: {value}\n"
+        context += "\n"
+
+    context += "### EXTRACTED FACTS\n"
 
     fact_ids = {}
     for i, fact in enumerate(facts, 1):
@@ -146,19 +158,22 @@ def _generate_with_audit(client, model, base_prompt, all_valid_tags, max_audit_r
     return raw_text, hallucinated
 
 
-def generate_red_flag_report(facts, metrics, flags, api_key, model):
+def generate_red_flag_report(facts, metrics, flags, api_key, model, metadata=None):
     """Narrate the deterministic outputs as an institutional red-flag report."""
     from google import genai
 
     client = genai.Client(api_key=api_key)
 
-    context, fact_ids, metric_ids, flag_ids = build_context(facts, metrics, flags)
+    context, fact_ids, metric_ids, flag_ids = build_context(
+        facts, metrics, flags, metadata
+    )
 
     user_prompt = (
         "Here is the structured data for the target company:\n\n"
         f"{context}\n\n"
         "Write a 3-section Red Flag Report:\n"
-        "1. Executive Summary (2-3 sentences)\n"
+        "1. Executive Summary (2-3 sentences, name the company if metadata "
+        "provides it)\n"
         "2. Key Financial Risks (Discuss the active flags, citing the evidence)\n"
         "3. Missing Data / Blind Spots (Mention the dormant rules and why we "
         "couldn't assess them)\n\n"
@@ -176,13 +191,15 @@ def generate_red_flag_report(facts, metrics, flags, api_key, model):
     )
 
 
-def answer_question(question, facts, metrics, flags, api_key, model):
+def answer_question(question, facts, metrics, flags, api_key, model, metadata=None):
     """Answer a user question strictly from the structured data store."""
     from google import genai
 
     client = genai.Client(api_key=api_key)
 
-    context, fact_ids, metric_ids, flag_ids = build_context(facts, metrics, flags)
+    context, fact_ids, metric_ids, flag_ids = build_context(
+        facts, metrics, flags, metadata
+    )
 
     base_prompt = (
         QA_SYSTEM_PROMPT

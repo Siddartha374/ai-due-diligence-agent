@@ -56,6 +56,7 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 Base = declarative_base()
 
+
 def _get_config(name, default=None):
     value = os.getenv(name)
     if value:
@@ -653,21 +654,28 @@ else:
                     )
 
         missing_count = len(facts_df[facts_df["value"] == "MISSING"])
+        stated_count = len(facts_df) - missing_count
+        verified_count = len(
+            facts_df[
+                (facts_df["citation_ok"] == True)
+                & (facts_df["value"] != "MISSING")
+            ]
+        )
+        unverified_count = stated_count - verified_count
 
-        if missing_count > 0:
-            st.warning(
-                f"{missing_count} requested values were NOT found in the document. "
-                "These are honest nulls, not guesses."
-            )
+        verification_rate = (
+            round(100 * verified_count / stated_count) if stated_count else 0
+        )
 
-        invalid_citations = len(facts_df[facts_df["citation_ok"] == False])
-
-        if invalid_citations > 0:
-            st.warning(
-                f"{invalid_citations} facts could not be verified against their "
-                "cited pages (snippet not found on the page). Treat them as "
-                "unverified."
-            )
+        st.info(
+            f"**Extraction quality panel** — stated facts extracted: "
+            f"{stated_count} · fields not stated in this document (honest "
+            f"nulls): {missing_count} · citations verified against the PDF: "
+            f"{verified_count} of {stated_count} ({verification_rate}%) · "
+            f"unverified: {unverified_count}. A high null count is normal: "
+            f"the schema requests a full US-GAAP + Ind-AS checklist and most "
+            f"filings state only part of it."
+        )
 
         st.write("### Derived metrics (computed deterministically in Python)")
 
@@ -811,9 +819,17 @@ if document_options and saved_facts and saved_flags:
             for flag in saved_flags
         ]
 
+        document_metadata = {
+            "company_name": selected_document.company_name,
+            "filename": selected_document.filename,
+            "document_type": selected_document.doc_type,
+            "page_count": selected_document.page_count,
+        }
+
         with st.spinner("Generating institutional memo (with citation audit)..."):
             report_text, hallucinations = generate_red_flag_report(
-                fact_dicts, metric_dicts, flag_dicts, api_key, model_name
+                fact_dicts, metric_dicts, flag_dicts, api_key, model_name,
+                metadata=document_metadata,
             )
 
         with SessionLocal() as session:
@@ -893,10 +909,17 @@ if document_options and saved_facts:
                 for flag in saved_flags
             ]
 
+            document_metadata = {
+                "company_name": selected_document.company_name,
+                "filename": selected_document.filename,
+                "document_type": selected_document.doc_type,
+                "page_count": selected_document.page_count,
+            }
+
             with st.spinner("Answering strictly from the structured store..."):
                 answer_text, qa_hallucinations = answer_question(
                     question, fact_dicts, metric_dicts, flag_dicts,
-                    api_key, model_name,
+                    api_key, model_name, metadata=document_metadata,
                 )
 
             if qa_hallucinations:
