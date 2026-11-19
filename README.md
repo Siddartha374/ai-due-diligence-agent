@@ -1,6 +1,6 @@
 # AI Due Diligence Agent
 
-**Institutional-grade AI due diligence for annual reports — every claim cited, every number verifiable, every blind spot declared.**
+** AI due diligence for annual reports — every claim cited, every number verifiable, every blind spot declared.**
 
 The AI Due Diligence Agent reads a company's PDF filings the way a rigorous junior analyst would: it extracts explicitly stated facts into a structured store, computes ratios deterministically, runs a pure-Python risk-rule engine, and only then lets an LLM narrate the results — with every citation audited against the source PDF before you see it.
 
